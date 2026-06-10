@@ -263,6 +263,41 @@ fun TimingsTab(viewModel: PrayerViewModel) {
 
     var showCityDialog by remember { mutableStateOf(false) }
 
+    // Real GPS trigger and permission requester
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fineGranted || coarseGranted) {
+            Toast.makeText(context, "جاري تحديد إحداثيات موقعك الحالي...", Toast.LENGTH_SHORT).show()
+            try {
+                val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                fusedClient.lastLocation.addOnSuccessListener { loc: android.location.Location? ->
+                    if (loc != null) {
+                        viewModel.selectCity(
+                            PrayerTimesCalculator.CityConfig(
+                                nameAr = "موقعي الحالي (GPS)",
+                                nameEn = "My Location (GPS)",
+                                latitude = loc.latitude,
+                                longitude = loc.longitude,
+                                timezone = 1.0,
+                                method = PrayerTimesCalculator.CalculationMethod.ALGERIA
+                            )
+                        )
+                        Toast.makeText(context, "تم تحديد مكانك الجغرافي بنجاح! 📍", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "لم نتمكن من جلب موقعك بالـ GPS. يرجى التأكد من تشغيل التموضع الجغرافي بالهاتف.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e("GPSLocator", "Security exception getting location: ${e.message}")
+            }
+        } else {
+            Toast.makeText(context, "يرجى منح أذونات الموقع لتشغيل ميزة تتبع موقع الـ GPS التلقائي.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -322,8 +357,13 @@ fun TimingsTab(viewModel: PrayerViewModel) {
                         .size(40.dp)
                         .background(EmeraldContainer, RoundedCornerShape(10.dp))
                         .clickable {
-                            // Instant GPS Trigger
-                            Toast.makeText(context, "جاري تحديد الموقع تلقائياً...", Toast.LENGTH_SHORT).show()
+                            // Dynamic Real GPS Tracker Launcher
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -1203,6 +1243,11 @@ fun MosquesTab(viewModel: PrayerViewModel) {
             }
         }
 
+        // Live Interactive Map display showing user + nearby mosques
+        item {
+            MosqueMapView(latitude = lat, longitude = lng, mosques = nearbyMosques)
+        }
+
         // GPS Activation Guide banner
         if (!hasLocPermission) {
             item {
@@ -1398,5 +1443,126 @@ fun MosqueItemCard(mosque: LocationHelper.Mosque) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example.data.LocationHelper.Mosque>) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    // Dynamically build Leaflet JS marker strings for each nearby mosque item
+    val mosqueMarkersJs = remember(mosques) {
+        val sb = StringBuilder()
+        mosques.forEach { mosque ->
+            val safeName = mosque.nameAr.replace("'", "\\'")
+            val safeAddress = mosque.addressAr.replace("'", "\\'")
+            val safeDistance = mosque.getFormattedDistance()
+            sb.append("""
+                L.marker([${mosque.latitude}, ${mosque.longitude}], {icon: mosqueIcon}).addTo(map)
+                    .bindPopup("<div style='text-align: right; direction: rtl;'><b>$safeName</b><br/>$safeAddress<br/><b>$safeDistance</b></div>");
+            """.trimIndent())
+        }
+        sb.toString()
+    }
+
+    val htmlContent = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+                body { margin: 0; padding: 0; background: #031A11; }
+                #map { height: 100vh; width: 100vw; background: #031A11; }
+                .leaflet-popup-content-wrapper {
+                    background: #031A11 !important;
+                    color: #F5E5C9 !important;
+                    border: 1px solid #D4AF37 !important;
+                    font-family: sans-serif;
+                    text-align: right;
+                    border-radius: 8px;
+                }
+                .leaflet-popup-tip {
+                    background: #031A11 !important;
+                    border-left: 1px solid #D4AF37 !important;
+                    border-bottom: 1px solid #D4AF37 !important;
+                }
+                .leaflet-control-zoom {
+                    border: 1px solid #D4AF37 !important;
+                }
+                .leaflet-control-zoom-in, .leaflet-control-zoom-out {
+                    background: #031A11 !important;
+                    color: #D4AF37 !important;
+                    border-bottom: 1px solid #D4AF37 !important;
+                }
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            <script>
+                var map = L.map('map', { zoomControl: true }).setView([$latitude, $longitude], 15);
+                
+                // Dark theme tile provider
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                    attribution: '© OpenStreetMap Core Map'
+                }).addTo(map);
+
+                // Marker design definitions
+                var userIcon = L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                });
+                
+                L.marker([$latitude, $longitude], {icon: userIcon}).addTo(map)
+                    .bindPopup("<div style='text-align: right; direction: rtl;'><b>موقعك الحالي الجغرافي 📍</b></div>").openPopup();
+
+                var mosqueIcon = L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                });
+
+                $mosqueMarkersJs
+            </script>
+        </body>
+        </html>
+    """.trimIndent()
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(260.dp)
+            .padding(vertical = 12.dp)
+            .border(1.5.dp, Color(0xFFD4AF37).copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF031A11))
+    ) {
+        androidx.compose.ui.viewinterop.AndroidView(
+            factory = { ctx ->
+                android.webkit.WebView(ctx).apply {
+                    webViewClient = android.webkit.WebViewClient()
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                    }
+                    loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+                }
+            },
+            update = { webView ->
+                webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+            },
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
