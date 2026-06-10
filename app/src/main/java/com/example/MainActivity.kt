@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.*
 import com.example.ui.theme.*
+import com.example.ui.AzkarTab
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -152,7 +153,20 @@ fun AppNavigationContainer(viewModel: PrayerViewModel) {
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
                     icon = { Icon(Icons.Default.Mosque, contentDescription = "المساجد") },
-                    label = { Text("المساجد القريبة", fontWeight = FontWeight.Bold) },
+                    label = { Text("المساجد", fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = EmeraldDeepDark,
+                        selectedTextColor = IslamicGold,
+                        indicatorColor = IslamicGold,
+                        unselectedIconColor = SlateGray,
+                        unselectedTextColor = SlateGray
+                    )
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    icon = { Icon(Icons.Default.Book, contentDescription = "الأذكار") },
+                    label = { Text("الأذكار", fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = EmeraldDeepDark,
                         selectedTextColor = IslamicGold,
@@ -173,6 +187,7 @@ fun AppNavigationContainer(viewModel: PrayerViewModel) {
                 0 -> TimingsTab(viewModel = viewModel)
                 1 -> SilentSettingsTab(viewModel = viewModel)
                 2 -> MosquesTab(viewModel = viewModel)
+                3 -> AzkarTab()
             }
 
             // Beautiful overlapping silent indicator bar if hardware is actively muted
@@ -1448,8 +1463,13 @@ fun MosqueItemCard(mosque: LocationHelper.Mosque) {
 
 @Composable
 fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example.data.LocationHelper.Mosque>) {
+    var selectedMapType by remember { mutableStateOf(1) } // 0: Classic, 1: Google Maps (Default)
     val context = androidx.compose.ui.platform.LocalContext.current
     
+    val googleMapsUrl = remember(latitude, longitude) {
+        "https://maps.google.com/maps?q=mosques+near+$latitude,$longitude&t=&z=14&ie=UTF8&iwloc=&output=embed"
+    }
+
     // Dynamically build Leaflet JS marker strings for each nearby mosque item
     val mosqueMarkersJs = remember(mosques) {
         val sb = StringBuilder()
@@ -1465,7 +1485,8 @@ fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example
         sb.toString()
     }
 
-    val htmlContent = """
+    val htmlContent = remember(latitude, longitude, mosqueMarkersJs) {
+        """
         <!DOCTYPE html>
         <html>
         <head>
@@ -1536,33 +1557,87 @@ fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example
         </body>
         </html>
     """.trimIndent()
+    }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(260.dp)
-            .padding(vertical = 12.dp)
-            .border(1.5.dp, Color(0xFFD4AF37).copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF031A11))
-    ) {
-        androidx.compose.ui.viewinterop.AndroidView(
-            factory = { ctx ->
-                android.webkit.WebView(ctx).apply {
-                    webViewClient = android.webkit.WebViewClient()
-                    settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = true
-                        loadWithOverviewMode = true
-                        useWideViewPort = true
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+        // Selector tab
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+                .background(EmeraldContainer, RoundedCornerShape(10.dp))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (selectedMapType == 1) IslamicGold else Color.Transparent)
+                    .clickable { selectedMapType = 1 }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "خرائط Google Maps الحية 🗺️",
+                    color = if (selectedMapType == 1) EmeraldDeepDark else SandText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (selectedMapType == 0) IslamicGold else Color.Transparent)
+                    .clickable { selectedMapType = 0 }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "الخريطة الداكنة المخصصة 🌐",
+                    color = if (selectedMapType == 0) EmeraldDeepDark else SandText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(280.dp)
+                .border(1.5.dp, Color(0xFFD4AF37).copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF031A11))
+        ) {
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        webViewClient = android.webkit.WebViewClient()
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            userAgentString = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Mobile Safari/537.36"
+                        }
+                        if (selectedMapType == 1) {
+                            loadUrl(googleMapsUrl)
+                        } else {
+                            loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+                        }
                     }
-                    loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
-                }
-            },
-            update = { webView ->
-                webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+                },
+                update = { webView ->
+                    if (selectedMapType == 1) {
+                        webView.loadUrl(googleMapsUrl)
+                    } else {
+                        webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
