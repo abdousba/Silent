@@ -193,11 +193,10 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun updateNearbyMosques() {
         viewModelScope.launch {
-            // Generate customized mosques based on user location
-            val mosques = LocationHelper.getNearbyMosques(
+            // Fetch live mosques based on current active latitude/longitude coordinates (works for GPS or chosen city)
+            val mosques = LocationHelper.fetchRealNearbyMosques(
                 _currentLatitude.value,
-                _currentLongitude.value,
-                _selectedCity.value.nameEn
+                _currentLongitude.value
             )
             _nearbyMosques.value = mosques
         }
@@ -205,7 +204,8 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun generateMosquesAroundCurrentCoordinates(latitude: Double, longitude: Double) {
         viewModelScope.launch {
-            val mosques = LocationHelper.generateDynamicNearbyMosques(latitude, longitude)
+            // Fetch live mosques around customized coordinates
+            val mosques = LocationHelper.fetchRealNearbyMosques(latitude, longitude)
             _nearbyMosques.value = mosques
         }
     }

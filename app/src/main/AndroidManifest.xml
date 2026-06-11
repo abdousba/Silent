@@ -21,6 +21,11 @@
     
     <!-- Permission required for posting silence-finished alerts on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- Permissions required for background execution & launching -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="true"

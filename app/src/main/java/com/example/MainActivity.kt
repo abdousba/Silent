@@ -1433,6 +1433,26 @@ fun MosquesTab(viewModel: PrayerViewModel) {
     val city by viewModel.selectedCity.collectAsState()
 
     var hasLocPermission by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    // Auto-check location permission on launch
+    LaunchedEffect(Unit) {
+        val fineGranted = androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val coarseGranted = androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (fineGranted || coarseGranted) {
+            hasLocPermission = true
+            try {
+                val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+                fusedClient.lastLocation.addOnSuccessListener { loc: Location? ->
+                    if (loc != null) {
+                        viewModel.updateCoordinates(loc.latitude, loc.longitude)
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e("MosqueLocator", "No location permission granted on start: ${e.message}")
+            }
+        }
+    }
 
     // Android Location Permission seeker
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -1442,32 +1462,23 @@ fun MosquesTab(viewModel: PrayerViewModel) {
         val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
         if (fineGranted || coarseGranted) {
             hasLocPermission = true
-            // Load real location coords
+            isRefreshing = true
             try {
                 val fusedClient = LocationServices.getFusedLocationProviderClient(context)
                 fusedClient.lastLocation.addOnSuccessListener { loc: Location? ->
                     if (loc != null) {
                         viewModel.updateCoordinates(loc.latitude, loc.longitude)
-                        viewModel.generateMosquesAroundCurrentCoordinates(loc.latitude, loc.longitude)
                     }
+                    isRefreshing = false
+                }.addOnFailureListener {
+                    isRefreshing = false
                 }
             } catch (e: SecurityException) {
                 Log.e("MosqueLocator", "No location permission granted: ${e.message}")
+                isRefreshing = false
             }
         }
     }
-
-    // Interactive circular sweeper animation state for the Radar HUD
-    val infiniteTransition = rememberInfiniteTransition(label = "RadarSweep")
-    val sweepRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "RadarRotation"
-    )
 
     LazyColumn(
         modifier = Modifier
@@ -1476,76 +1487,84 @@ fun MosquesTab(viewModel: PrayerViewModel) {
     ) {
         item { Spacer(modifier = Modifier.height(20.dp)) }
 
+        // Sleek visual card header with status and interactive refresh button
         item {
-            Text(
-                text = "تحديد موقع المساجد القريبة 🕌",
-                color = SandText,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                textAlign = TextAlign.Right,
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp)
-            )
-        }
-
-        // Radar Scanning HUD
-        item {
-            Box(
-                modifier = Modifier
-                    .fillDarkRadarContainer()
-                    .height(220.dp)
-                    .background(EmeraldContainer, RoundedCornerShape(16.dp))
-                    .border(1.dp, IslamicGold.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = EmeraldContainer),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, IslamicGold.copy(alpha = 0.15f))
             ) {
-                // Drawn sweeps and concentric targets
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val width = size.width
-                    val height = size.height
-                    val center = Offset(width / 2f, height / 2f)
-                    val maxRadius = minOf(width, height) * 0.42f
-
-                    // Draw static target rings
-                    drawCircle(color = IslamicGold.copy(alpha = 0.1f), radius = maxRadius * 0.33f, center = center, style = Stroke(1.dp.toPx()))
-                    drawCircle(color = IslamicGold.copy(alpha = 0.15f), radius = maxRadius * 0.66f, center = center, style = Stroke(1.dp.toPx()))
-                    drawCircle(color = IslamicGold.copy(alpha = 0.2f), radius = maxRadius, center = center, style = Stroke(1.5.dp.toPx()))
-
-                    // Crosshair grid lines
-                    drawLine(color = SuiteGoldAlpha, start = Offset(center.x - maxRadius, center.y), end = Offset(center.x + maxRadius, center.y), strokeWidth = 1f)
-                    drawLine(color = SuiteGoldAlpha, start = Offset(center.x, center.y - maxRadius), end = Offset(center.x, center.y + maxRadius), strokeWidth = 1f)
-
-                    // Draw animated radar sweeping line
-                    val angleRad = Math.toRadians(sweepRotation.toDouble())
-                    val endX = center.x + maxRadius * cos(angleRad).toFloat()
-                    val endY = center.y + maxRadius * sin(angleRad).toFloat()
-
-                    drawLine(
-                        color = IslamicGold,
-                        start = center,
-                        end = Offset(endX, endY),
-                        strokeWidth = 2.dp.toPx()
-                    )
-                }
-
-                // Centered gold core symbol
-                Icon(
-                    imageVector = Icons.Default.Mosque,
-                    contentDescription = "Radar dome center",
-                    tint = IslamicGold,
-                    modifier = Modifier.size(36.dp)
-                )
-
-                // Scanning HUD overlays
-                Text(
-                    text = "رادار التحديد الجغرافي النشط",
-                    color = SandText.copy(alpha = 0.7f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
+                Row(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 12.dp)
-                )
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Update Action Button
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            color = IslamicGold,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else if (hasLocPermission) {
+                        IconButton(
+                            onClick = {
+                                isRefreshing = true
+                                try {
+                                    val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+                                    fusedClient.lastLocation.addOnSuccessListener { loc: Location? ->
+                                        if (loc != null) {
+                                            viewModel.updateCoordinates(loc.latitude, loc.longitude)
+                                        }
+                                        isRefreshing = false
+                                    }.addOnFailureListener {
+                                        isRefreshing = false
+                                    }
+                                } catch (e: SecurityException) {
+                                    isRefreshing = false
+                                }
+                            },
+                            modifier = Modifier
+                                .background(IslamicGold.copy(alpha = 0.15f), CircleShape)
+                                .size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "تحديث الموقع والبحث عن مساجد قريبة",
+                                tint = IslamicGold,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    } else {
+                        // Small placeholder to balance spacer
+                        Spacer(modifier = Modifier.size(36.dp))
+                    }
+
+                    // Status and Info
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+                    ) {
+                        Text(
+                            text = "تحديد المساجد القريبة 🕌",
+                            color = SandText,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (hasLocPermission) "موقعك الجغرافي نشط وحي 🛰️" else "يعرض مساجد مقترحة في ${city.nameAr}",
+                            color = if (hasLocPermission) IslamicGold else SlateGray,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
         }
 
@@ -1562,7 +1581,8 @@ fun MosquesTab(viewModel: PrayerViewModel) {
                         .fillMaxWidth()
                         .padding(vertical = 12.dp),
                     colors = CardDefaults.cardColors(containerColor = IslamicEmerald.copy(alpha = 0.15f)),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, IslamicEmerald.copy(alpha = 0.2f))
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
@@ -1576,7 +1596,7 @@ fun MosquesTab(viewModel: PrayerViewModel) {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "يرجى منح صلاحية تفعيل الـ GPS لنتمكن من عرض أقرب المساجد بالنسبة لإحداثياتك الحالية بدقة وعرض الاتجاهات الفورية.",
+                            text = "يرجى تفعيل الـ GPS لنتمكن من جلب وعرض أقرب المساجد الحقيقية لإحداثياتك الحالية بدقة وعرض المسافة والاتجاه الفعلي.",
                             color = SlateGray,
                             fontSize = 11.sp,
                             textAlign = TextAlign.Right,
@@ -1618,10 +1638,10 @@ fun MosquesTab(viewModel: PrayerViewModel) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (hasLocPermission) "مساجد بجوارك حالياً" else "مساجد مقترحة في ${city.nameAr}",
+                    text = if (hasLocPermission) "مساجد بجوارك حالياً (بيانات حية)" else "مساجد مقترحة في ${city.nameAr}",
                     color = SandText,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    fontSize = 14.sp
                 )
             }
         }
@@ -1637,7 +1657,7 @@ fun MosquesTab(viewModel: PrayerViewModel) {
                 ) {
                     Icon(Icons.Default.CloudQueue, contentDescription = "Empty", tint = SlateGray, modifier = Modifier.size(40.dp))
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("لا توجد نتائج مساجد حالياً... تأكد من اختيار مدينة.", color = SlateGray, fontSize = 12.sp)
+                    Text("لا توجد نتائج مساجد حالياً... جاري البحث والتحميل.", color = SlateGray, fontSize = 12.sp)
                 }
             }
         } else {
@@ -1825,6 +1845,46 @@ fun StartupPermissionRequestDialog(onDismiss: () -> Unit) {
         )
     }
 
+    val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager }
+    var isBatteryOptimizedIgnored by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                powerManager.isIgnoringBatteryOptimizations(context.packageName)
+            } else {
+                true
+            }
+        )
+    }
+
+    // Dynamic state listener that updates when returning to the app from Android Settings
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                hasLocationPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                
+                hasDndPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    notificationManager.isNotificationPolicyAccessGranted
+                } else {
+                    true
+                }
+                
+                isBatteryOptimizedIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                } else {
+                    true
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // Permission launcher for Location
     val locationLauncher = rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
@@ -2003,6 +2063,73 @@ fun StartupPermissionRequestDialog(onDismiss: () -> Unit) {
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("تفعيل", color = EmeraldDeepDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 3. Battery Optimization Exempt Row
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isBatteryOptimizedIgnored) EmeraldContainer else Color(0xFF032215)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "العمل بالخلفية دون قيود ⚡",
+                                color = SandText,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "لتجاوز قيود توفير الطاقة والبطارية لضمان دقة كتم الصوت وتشغيل التنبيهات حتى عند إغلاق التطبيق ومسحه من الذاكرة الحية.",
+                                color = SandText.copy(alpha = 0.7f),
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (isBatteryOptimizedIgnored) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Granted",
+                                tint = IslamicGold,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                        try {
+                                            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                                data = android.net.Uri.parse("package:${context.packageName}")
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            try {
+                                                val intent = Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                                context.startActivity(intent)
+                                            } catch (ex: Exception) {
+                                                android.widget.Toast.makeText(context, "فشل فتح الإعدادات تلقائياً", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = IslamicGold),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("سماح", color = EmeraldDeepDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

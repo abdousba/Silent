@@ -167,6 +167,16 @@ class PrayerSilenceReceiver : BroadcastReceiver() {
                     setPackage(context.packageName)
                 }
                 context.sendBroadcast(updateIntent)
+                try {
+                    val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    if (launchIntent != null) {
+                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        context.startActivity(launchIntent)
+                        Log.d("PrayerSilenceReceiver", "Directly launched activity in response to MUTE.")
+                    }
+                } catch (e: Exception) {
+                    Log.e("PrayerSilenceReceiver", "Launch activity failed: ${e.message}")
+                }
             }
 
             ACTION_UNMUTE_DEVICE -> {
@@ -210,6 +220,16 @@ class PrayerSilenceReceiver : BroadcastReceiver() {
                     setPackage(context.packageName)
                 }
                 context.sendBroadcast(updateIntent)
+                try {
+                    val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    if (launchIntent != null) {
+                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        context.startActivity(launchIntent)
+                        Log.d("PrayerSilenceReceiver", "Directly launched activity in response to UNMUTE.")
+                    }
+                } catch (e: Exception) {
+                    Log.e("PrayerSilenceReceiver", "Launch activity failed on UNMUTE: ${e.message}")
+                }
             }
         }
     }
@@ -258,6 +278,8 @@ class PrayerSilenceReceiver : BroadcastReceiver() {
             .setContentTitle("نداء الصلاة 🕌")
             .setContentText("حان الآن موعد أذان صلاة $prayerNameAr في منطقتك")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(pendingIntent, true)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setSound(soundUri)
@@ -380,6 +402,8 @@ class PrayerSilenceReceiver : BroadcastReceiver() {
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(pendingIntent, true)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

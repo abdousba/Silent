@@ -6,6 +6,15 @@ import android.location.Location
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlin.math.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object LocationHelper {
 
@@ -151,5 +160,94 @@ object LocationHelper {
         }
 
         return list.sortedBy { it.distanceMeter }
+    }
+
+    // Fetches live mosques around a given coordinate from the Overpass API, falling back to mock points if offline
+    suspend fun fetchRealNearbyMosques(latitude: Double, longitude: Double): List<Mosque> = withContext(Dispatchers.IO) {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+
+        // Overpass QL query: search up to 15km for mosques/places of worship for Muslims
+        val query = """
+            [out:json][timeout:20];
+            (
+              node["amenity"="place_of_worship"]["religion"="muslim"](around:15000,$latitude,$longitude);
+              way["amenity"="place_of_worship"]["religion"="muslim"](around:15000,$latitude,$longitude);
+            );
+            out center;
+        """.trimIndent()
+
+        val requestBody = RequestBody.create(
+            "text/plain; charset=utf-8".toMediaTypeOrNull(),
+            query
+        )
+
+        val request = Request.Builder()
+            .url("https://overpass-api.de/api/interpreter")
+            .post(requestBody)
+            .build()
+
+        val list = mutableListOf<Mosque>()
+
+        try {
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val stream = response.body?.string()
+                    if (!stream.isNullOrEmpty()) {
+                        val root = JSONObject(stream)
+                        val elements = root.optJSONArray("elements")
+                        if (elements != null) {
+                            for (i in 0 until elements.length()) {
+                                val elem = elements.getJSONObject(i)
+                                val type = elem.optString("type")
+                                val mLat = if (type == "node") {
+                                    elem.optDouble("lat", 0.0)
+                                } else {
+                                    elem.optJSONObject("center")?.optDouble("lat", 0.0) ?: 0.0
+                                }
+                                val mLng = if (type == "node") {
+                                    elem.optDouble("lon", 0.0)
+                                } else {
+                                    elem.optJSONObject("center")?.optDouble("lon", 0.0) ?: 0.0
+                                }
+                                if (mLat == 0.0 || mLng == 0.0) continue
+
+                                val tags = elem.optJSONObject("tags")
+                                val nameAr = tags?.optString("name:ar") ?: tags?.optString("name") ?: "مسجد قريب"
+                                val nameEn = tags?.optString("name:en") ?: tags?.optString("name") ?: "Nearby Mosque"
+                                
+                                val streetAr = tags?.optString("addr:street") ?: "حي المصلين"
+                                val streetEn = tags?.optString("addr:street:en") ?: "Worshippers District"
+
+                                val mosque = Mosque(
+                                    nameAr = nameAr,
+                                    nameEn = nameEn,
+                                    latitude = mLat,
+                                    longitude = mLng,
+                                    addressAr = streetAr,
+                                    addressEn = streetEn
+                                )
+                                list.add(mosque)
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        if (list.isEmpty()) {
+            generateDynamicNearbyMosques(latitude, longitude)
+        } else {
+            for (mosque in list) {
+                val (dist, bear) = calculateDistanceAndBearing(latitude, longitude, mosque.latitude, mosque.longitude)
+                mosque.distanceMeter = dist
+                mosque.bearingDegrees = bear
+            }
+            list.sortedBy { it.distanceMeter }
+        }
     }
 }
