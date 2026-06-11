@@ -804,53 +804,235 @@ fun CitySelectionDialog(
     onCitySelected: (PrayerTimesCalculator.CityConfig) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedTab by remember { mutableStateOf(0) } // 0 = ولايات الجزائر (58), 1 = مدن وعواصم أخرى
+
+    // Separate Algeria list and other capitals
+    val algerianWilayas = remember(cities) {
+        cities.filter { it.method == PrayerTimesCalculator.CalculationMethod.ALGERIA }
+    }
+    
+    val otherCapitals = remember(cities) {
+        cities.filter { it.method != PrayerTimesCalculator.CalculationMethod.ALGERIA }
+    }
+
+    val currentList = if (selectedTab == 0) algerianWilayas else otherCapitals
+
+    // Apply Filter/Search
+    val filteredList = remember(currentList, searchQuery) {
+        if (searchQuery.isBlank()) {
+            currentList
+        } else {
+            currentList.filter {
+                it.nameAr.contains(searchQuery, ignoreCase = true) ||
+                it.nameEn.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = EmeraldContainer,
         title = {
-            Text(
-                "اختر المدينة لتحديد مواقيت دقيقة",
-                color = SandText,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Right
-            )
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    "تحديد الموقع الجغرافي 📍",
+                    color = SandText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Right,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "وزارة الشؤون الدينية والأوقاف الجزائرية",
+                    color = IslamicGold,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Right,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
+                )
+            }
         },
         text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
-                items(cities) { city ->
-                    val isFav = city.nameEn == currentSelected.nameEn
-                    Row(
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+            ) {
+                // Category Tabs Selector
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                        .background(Color(0xFF031A11), RoundedCornerShape(12.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (selectedTab == 0) IslamicEmerald else Color.Transparent)
+                            .clickable { selectedTab = 0 }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "ولايات الجزائر (58)",
+                            color = if (selectedTab == 0) SandText else SlateGray,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (selectedTab == 1) IslamicEmerald else Color.Transparent)
+                            .clickable { selectedTab = 1 }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "مدن وعواصم أخرى",
+                            color = if (selectedTab == 1) SandText else SlateGray,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+
+                // Beautiful and clean Search field
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            text = if (selectedTab == 0) "ابحث باسم الولاية أو الرقم..." else "ابحث عن مدينة أخرى...",
+                            color = SlateGray.copy(alpha = 0.7f),
+                            fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Right
+                        )
+                    },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        color = SandText,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Right
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = IslamicGold
+                        )
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = SandText,
+                        unfocusedTextColor = SandText,
+                        focusedBorderColor = IslamicGold,
+                        unfocusedBorderColor = IslamicGold.copy(alpha = 0.3f),
+                        focusedContainerColor = Color(0xFF031A11),
+                        unfocusedContainerColor = Color(0xFF031A11),
+                        cursorColor = IslamicGold
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                // List of filtered cities/Provinces
+                if (filteredList.isEmpty()) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onCitySelected(city) }
-                            .background(
-                                if (isFav) IslamicEmerald.copy(alpha = 0.2f) else Color.Transparent,
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (isFav) {
-                            Icon(Icons.Default.Check, contentDescription = "Selected", tint = IslamicGold)
-                        } else {
-                            Spacer(modifier = Modifier.width(20.dp))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "لم يتم العثور على نتائج 🔍",
+                                color = SlateGray,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center
+                            )
                         }
-                        Text(
-                            text = "${city.nameAr} (${city.nameEn})",
-                            color = if (isFav) IslamicGold else SandText,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        items(filteredList) { city ->
+                            val isFav = city.nameEn == currentSelected.nameEn
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable { onCitySelected(city) },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isFav) Color(0xFF032215) else Color.Transparent
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    width = 1.dp,
+                                    color = if (isFav) IslamicGold.copy(alpha = 0.5f) else Color.Transparent
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Right section: Select state name
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.End,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(
+                                            text = city.nameAr,
+                                            color = if (isFav) IslamicGold else SandText,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            textAlign = TextAlign.Right,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                    
+                                    // Left section: Check or info indicator
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    if (isFav) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = IslamicGold,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("إغلاق", color = IslamicGold, fontWeight = FontWeight.Bold)
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            ) {
+                Text("إغلاق", color = IslamicGold, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
     )

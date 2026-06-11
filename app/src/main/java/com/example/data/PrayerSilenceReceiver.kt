@@ -271,16 +271,16 @@ class PrayerSilenceReceiver : BroadcastReceiver() {
         val cityPrefs = context.getSharedPreferences("saved_city_prefs", Context.MODE_PRIVATE)
         if (!cityPrefs.contains("city_name_en")) return
         
-        val nameAr = cityPrefs.getString("city_name_ar", "مكة المكرمة") ?: "مكة المكرمة"
-        val nameEn = cityPrefs.getString("city_name_en", "Makkah") ?: "Makkah"
-        val latitude = cityPrefs.getFloat("city_latitude", 21.4225f).toDouble()
-        val longitude = cityPrefs.getFloat("city_longitude", 39.8262f).toDouble()
-        val timezone = cityPrefs.getFloat("city_timezone", 3.0f).toDouble()
-        val methodName = cityPrefs.getString("city_method", PrayerTimesCalculator.CalculationMethod.UMM_AL_QURA.name)
+        val nameAr = cityPrefs.getString("city_name_ar", "16- الجزائر العاصمة") ?: "16- الجزائر العاصمة"
+        val nameEn = cityPrefs.getString("city_name_en", "16- Algiers") ?: "16- Algiers"
+        val latitude = cityPrefs.getFloat("city_latitude", 36.7538f).toDouble()
+        val longitude = cityPrefs.getFloat("city_longitude", 3.0588f).toDouble()
+        val timezone = cityPrefs.getFloat("city_timezone", 1.0f).toDouble()
+        val methodName = cityPrefs.getString("city_method", PrayerTimesCalculator.CalculationMethod.ALGERIA.name)
         val method = try {
-            PrayerTimesCalculator.CalculationMethod.valueOf(methodName ?: "UMM_AL_QURA")
+            PrayerTimesCalculator.CalculationMethod.valueOf(methodName ?: "ALGERIA")
         } catch (e: Exception) {
-            PrayerTimesCalculator.CalculationMethod.UMM_AL_QURA
+            PrayerTimesCalculator.CalculationMethod.ALGERIA
         }
 
         val calendar = java.util.Calendar.getInstance()

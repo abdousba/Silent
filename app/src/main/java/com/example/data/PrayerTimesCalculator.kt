@@ -147,16 +147,26 @@ object PrayerTimesCalculator {
 
         val obliq = 23.439 - 0.00000036 * d
         val declination = Math.toDegrees(asin(sin(Math.toRadians(obliq)) * sin(Math.toRadians(l))))
-        val rawEquationOfTime = 9.87 * sin(Math.toRadians(2.0 * l)) - 7.53 * cos(Math.toRadians(g)) - 1.5 * sin(Math.toRadians(g))
+        
+        // Precise Right Ascension (RA) in degrees
+        var ra = Math.toDegrees(atan2(cos(Math.toRadians(obliq)) * sin(Math.toRadians(l)), cos(Math.toRadians(l))))
+        ra = fixAngle(ra)
+        
+        // Precise Equation of Time (EoT) in minutes
+        var eotDiff = q - ra
+        if (eotDiff < -180.0) eotDiff += 360.0
+        if (eotDiff > 180.0) eotDiff -= 360.0
+        val rawEquationOfTime = eotDiff * 4.0
         
         // Dhuhr calculation (noon point)
         val midDayDecimal = 12.0 + timezoneOffset - (longitude / 15.0) - (rawEquationOfTime / 60.0)
 
         // Hour angle equation helper
-        fun hourAngle(angle: Double, sign: Int): Double {
+        fun hourAngle(angle: Double, sign: Int, isBelowHorizon: Boolean = true): Double {
+            val targetAngle = if (isBelowHorizon) -angle else angle
             val radiansLat = Math.toRadians(latitude)
             val radiansDecl = Math.toRadians(declination)
-            val cosH = (sin(Math.toRadians(-angle)) - sin(radiansLat) * sin(radiansDecl)) / (cos(radiansLat) * cos(radiansDecl))
+            val cosH = (sin(Math.toRadians(targetAngle)) - sin(radiansLat) * sin(radiansDecl)) / (cos(radiansLat) * cos(radiansDecl))
             if (cosH > 1.0 || cosH < -1.0) {
                 return Double.NaN
             }
@@ -176,8 +186,8 @@ object PrayerTimesCalculator {
         val shadowFactor = if (juristicRule == JuristicRule.HANAFI) 2.0 else 1.0
         val latMinusDecl = Math.toRadians(abs(latitude - declination))
         val asrAngleRad = atan(1.0 / (shadowFactor + tan(latMinusDecl)))
-        val asrAngle = 90.0 - Math.toDegrees(asrAngleRad)
-        val asrHA = hourAngle(asrAngle, 1)
+        val asrAngle = Math.toDegrees(asrAngleRad)
+        val asrHA = hourAngle(asrAngle, 1, false)
         val asrTime = if (asrHA.isNaN()) midDayDecimal + 2.5 else midDayDecimal + (asrHA / 15.0)
 
         // 6. Maghrib Hour Angle (standard angle 0.833 for sunset)

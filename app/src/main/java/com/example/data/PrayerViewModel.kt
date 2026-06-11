@@ -24,13 +24,16 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
     private val repository = PrayerRepository(database.prayerDao())
 
     // 1. Core Configurable States
-    private val _selectedCity = MutableStateFlow(PrayerTimesCalculator.preconfiguredCities[0]) // Makkah
+    private val _selectedCity = MutableStateFlow(
+        PrayerTimesCalculator.preconfiguredCities.find { it.nameEn.contains("Algiers") } 
+            ?: PrayerTimesCalculator.preconfiguredCities[0]
+    )
     val selectedCity: StateFlow<PrayerTimesCalculator.CityConfig> = _selectedCity.asStateFlow()
 
-    private val _currentLatitude = MutableStateFlow(21.4225)
+    private val _currentLatitude = MutableStateFlow(36.7538)
     val currentLatitude: StateFlow<Double> = _currentLatitude.asStateFlow()
 
-    private val _currentLongitude = MutableStateFlow(39.8262)
+    private val _currentLongitude = MutableStateFlow(3.0588)
     val currentLongitude: StateFlow<Double> = _currentLongitude.asStateFlow()
 
     private val _juristicRule = MutableStateFlow(PrayerTimesCalculator.JuristicRule.STANDARD)
@@ -124,16 +127,16 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
         val prefs = context.getSharedPreferences("saved_city_prefs", Context.MODE_PRIVATE)
         if (!prefs.contains("city_name_en")) return null
         
-        val nameAr = prefs.getString("city_name_ar", "مكة المكرمة") ?: "مكة المكرمة"
-        val nameEn = prefs.getString("city_name_en", "Makkah") ?: "Makkah"
-        val latitude = prefs.getFloat("city_latitude", 21.4225f).toDouble()
-        val longitude = prefs.getFloat("city_longitude", 39.8262f).toDouble()
-        val timezone = prefs.getFloat("city_timezone", 3.0f).toDouble()
-        val methodName = prefs.getString("city_method", PrayerTimesCalculator.CalculationMethod.UMM_AL_QURA.name)
+        val nameAr = prefs.getString("city_name_ar", "16- الجزائر العاصمة") ?: "16- الجزائر العاصمة"
+        val nameEn = prefs.getString("city_name_en", "16- Algiers") ?: "16- Algiers"
+        val latitude = prefs.getFloat("city_latitude", 36.7538f).toDouble()
+        val longitude = prefs.getFloat("city_longitude", 3.0588f).toDouble()
+        val timezone = prefs.getFloat("city_timezone", 1.0f).toDouble()
+        val methodName = prefs.getString("city_method", PrayerTimesCalculator.CalculationMethod.ALGERIA.name)
         val method = try {
-            PrayerTimesCalculator.CalculationMethod.valueOf(methodName ?: "UMM_AL_QURA")
+            PrayerTimesCalculator.CalculationMethod.valueOf(methodName ?: "ALGERIA")
         } catch (e: Exception) {
-            PrayerTimesCalculator.CalculationMethod.UMM_AL_QURA
+            PrayerTimesCalculator.CalculationMethod.ALGERIA
         }
         
         return PrayerTimesCalculator.CityConfig(nameAr, nameEn, latitude, longitude, timezone, method)
