@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/prayer_icon_1781071856160"
+        android:drawable="@drawable/silent_bell_mosque_app_icon_1781161527079"
         android:gravity="center" />
 </layer-list>

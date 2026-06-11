@@ -6,6 +6,15 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     
+    <!-- Permission for internet required by WebView (Google Maps WebView display) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- Permission for vibrating notifications and feedback -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    
+    <!-- Permission to restore background alarms on system reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    
     <!-- Permissions required for automatic DND (Silent mode) turning -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -42,6 +51,8 @@
             <intent-filter>
                 <action android:name="com.example.silentpray.ACTION_MUTE" />
                 <action android:name="com.example.silentpray.ACTION_UNMUTE" />
+                <action android:name="com.example.silentpray.ACTION_PRAYER_ALARM" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 

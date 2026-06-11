@@ -1,5 +1,5 @@
 {
-  "name": "Silent Prayer - صامت للصلاة",
+  "name": "خشوع",
   "description": "Silent mode during prayer times, notifications after, and nearby mosque locator",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

@@ -78,6 +78,14 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
     private var countdownJob: Job? = null
 
     init {
+        // Load persisted city config if available
+        val savedCity = loadSelectedCity()
+        if (savedCity != null) {
+            _selectedCity.value = savedCity
+            _currentLatitude.value = savedCity.latitude
+            _currentLongitude.value = savedCity.longitude
+        }
+
         viewModelScope.launch {
             // Pre-seed Room db default settings if needed
             repository.prepopulateDefaultSettingsIfNeeded()
@@ -99,6 +107,38 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun saveSelectedCity(city: PrayerTimesCalculator.CityConfig) {
+        val prefs = context.getSharedPreferences("saved_city_prefs", Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putString("city_name_ar", city.nameAr)
+            putString("city_name_en", city.nameEn)
+            putFloat("city_latitude", city.latitude.toFloat())
+            putFloat("city_longitude", city.longitude.toFloat())
+            putFloat("city_timezone", city.timezone.toFloat())
+            putString("city_method", city.method.name)
+            apply()
+        }
+    }
+
+    private fun loadSelectedCity(): PrayerTimesCalculator.CityConfig? {
+        val prefs = context.getSharedPreferences("saved_city_prefs", Context.MODE_PRIVATE)
+        if (!prefs.contains("city_name_en")) return null
+        
+        val nameAr = prefs.getString("city_name_ar", "مكة المكرمة") ?: "مكة المكرمة"
+        val nameEn = prefs.getString("city_name_en", "Makkah") ?: "Makkah"
+        val latitude = prefs.getFloat("city_latitude", 21.4225f).toDouble()
+        val longitude = prefs.getFloat("city_longitude", 39.8262f).toDouble()
+        val timezone = prefs.getFloat("city_timezone", 3.0f).toDouble()
+        val methodName = prefs.getString("city_method", PrayerTimesCalculator.CalculationMethod.UMM_AL_QURA.name)
+        val method = try {
+            PrayerTimesCalculator.CalculationMethod.valueOf(methodName ?: "UMM_AL_QURA")
+        } catch (e: Exception) {
+            PrayerTimesCalculator.CalculationMethod.UMM_AL_QURA
+        }
+        
+        return PrayerTimesCalculator.CityConfig(nameAr, nameEn, latitude, longitude, timezone, method)
+    }
+
     // Call this whenever location, city, date, or juristic rule changes
     fun recalculatePrayerTimes() {
         val calendar = Calendar.getInstance()
@@ -113,12 +153,14 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
             juristicRule = _juristicRule.value
         )
         _prayerTimings.value = timings
+        scheduleAllPrayerAlarms()
     }
 
     fun selectCity(city: PrayerTimesCalculator.CityConfig) {
         _selectedCity.value = city
         _currentLatitude.value = city.latitude
         _currentLongitude.value = city.longitude
+        saveSelectedCity(city)
         recalculatePrayerTimes()
         updateNearbyMosques()
     }
@@ -131,6 +173,17 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateCoordinates(latitude: Double, longitude: Double) {
         _currentLatitude.value = latitude
         _currentLongitude.value = longitude
+        // Save as GPS virtual location
+        val gpsCity = PrayerTimesCalculator.CityConfig(
+            nameAr = "موقعي الحالي (GPS)",
+            nameEn = "My Location (GPS)",
+            latitude = latitude,
+            longitude = longitude,
+            timezone = 1.0,
+            method = PrayerTimesCalculator.CalculationMethod.ALGERIA
+        )
+        _selectedCity.value = gpsCity
+        saveSelectedCity(gpsCity)
         recalculatePrayerTimes()
         updateNearbyMosques()
     }
@@ -176,6 +229,81 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
                     status = newStatus
                 )
             )
+        }
+    }
+
+    fun scheduleAllPrayerAlarms() {
+        val timings = _prayerTimings.value ?: return
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val prayers = listOf(
+            Triple("الفجر", "Fajr", timings.fajrMinutes),
+            Triple("الظهر", "Dhuhr", timings.dhuhrMinutes),
+            Triple("العصر", "Asr", timings.asrMinutes),
+            Triple("المغرب", "Maghrib", timings.maghribMinutes),
+            Triple("العشاء", "Isha", timings.ishaMinutes)
+        )
+
+        val calendar = Calendar.getInstance()
+        val todayYear = calendar.get(Calendar.YEAR)
+        val todayMonth = calendar.get(Calendar.MONTH)
+        val todayDay = calendar.get(Calendar.DAY_OF_MONTH)
+
+        prayers.forEachIndexed { index, (nameAr, nameEn, minutes) ->
+            val alarmTime = Calendar.getInstance().apply {
+                set(Calendar.YEAR, todayYear)
+                set(Calendar.MONTH, todayMonth)
+                set(Calendar.DAY_OF_MONTH, todayDay)
+                set(Calendar.HOUR_OF_DAY, minutes / 60)
+                set(Calendar.MINUTE, minutes % 60)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            // If the time is already in the past, schedule it for the next day
+            if (alarmTime.timeInMillis <= System.currentTimeMillis()) {
+                alarmTime.add(Calendar.DAY_OF_YEAR, 1)
+            }
+
+            val alarmIntent = Intent(context, PrayerSilenceReceiver::class.java).apply {
+                action = PrayerSilenceReceiver.ACTION_PRAYER_ALARM
+                putExtra("prayer_name_ar", nameAr)
+                putExtra("prayer_name_en", nameEn)
+            }
+
+            // Unique requestCode per prayer
+            val requestCode = 3000 + index
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                alarmIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        alarmTime.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        alarmTime.timeInMillis,
+                        pendingIntent
+                    )
+                }
+                Log.d("PrayerViewModel", "Scheduled alarm for $nameEn at ${alarmTime.time}")
+            } catch (e: Exception) {
+                // Defensive fallback to standard AlarmManager.set in case permission is restricted
+                alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    alarmTime.timeInMillis,
+                    pendingIntent
+                )
+            }
         }
     }
 

@@ -63,6 +63,10 @@ import com.example.ui.theme.*
 import com.example.ui.AzkarTab
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.graphicsLayer
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -114,9 +118,18 @@ class MainActivity : ComponentActivity() {
 fun AppNavigationContainer(viewModel: PrayerViewModel) {
     val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) }
+    var showStartupPermissions by remember { mutableStateOf(true) }
+    var showSplashScreen by remember { mutableStateOf(true) }
 
-    // Bottom Navigation with system safe inset padding
-    Scaffold(
+    if (showSplashScreen) {
+        SplashScreenComponent(onFinished = { showSplashScreen = false })
+    } else {
+        if (showStartupPermissions) {
+            StartupPermissionRequestDialog(onDismiss = { showStartupPermissions = false })
+        }
+
+        // Bottom Navigation with system safe inset padding
+        Scaffold(
         bottomBar = {
             NavigationBar(
                 modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
@@ -260,6 +273,107 @@ fun AppNavigationContainer(viewModel: PrayerViewModel) {
             }
         }
     }
+  }
+}
+
+@Composable
+fun SplashScreenComponent(onFinished: () -> Unit) {
+    var startAnimation by remember { mutableStateOf(false) }
+
+    val alphaAnim by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 1500,
+            easing = FastOutSlowInEasing
+        )
+    )
+
+    val scaleAnim by animateFloatAsState(
+        targetValue = if (startAnimation) 1.0f else 0.7f,
+        animationSpec = tween(
+            durationMillis = 1500,
+            easing = FastOutSlowInEasing
+        )
+    )
+
+    LaunchedEffect(key1 = true) {
+        startAnimation = true
+        delay(2500)
+        onFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF031A11)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Card(
+                modifier = Modifier
+                    .size(160.dp)
+                    .graphicsLayer(
+                        alpha = alphaAnim,
+                        scaleX = scaleAnim,
+                        scaleY = scaleAnim
+                    ),
+                shape = RoundedCornerShape(32.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0C3325)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, IslamicGold.copy(alpha = 0.5f))
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.silent_bell_mosque_app_icon_1781161527079),
+                        contentDescription = "أيقونة تطبيق خشوع",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Text(
+                text = "خشوع",
+                color = IslamicGold,
+                fontSize = 38.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.graphicsLayer(alpha = alphaAnim)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "مسجد بدون إزعاج • صلاة خشوع",
+                color = SandText,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.graphicsLayer(alpha = alphaAnim)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Mosque Free from Distractions • Calm Devotion",
+                color = SlateGray,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Normal,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.graphicsLayer(alpha = alphaAnim)
+            )
+        }
+    }
 }
 
 // ==========================================
@@ -277,6 +391,7 @@ fun TimingsTab(viewModel: PrayerViewModel) {
     val juristicRule by viewModel.juristicRule.collectAsState()
 
     var showCityDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     // Real GPS trigger and permission requester
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -333,17 +448,7 @@ fun TimingsTab(viewModel: PrayerViewModel) {
             ) {
                 IconButton(
                     onClick = {
-                        val gRule = if (juristicRule == PrayerTimesCalculator.JuristicRule.STANDARD) {
-                            PrayerTimesCalculator.JuristicRule.HANAFI
-                        } else {
-                            PrayerTimesCalculator.JuristicRule.STANDARD
-                        }
-                        viewModel.updateJuristicRule(gRule)
-                        Toast.makeText(
-                            context,
-                            if (gRule == PrayerTimesCalculator.JuristicRule.HANAFI) "تم تحديد المذهب الحنفي" else "تم تحديد الجمهور (الشافعي، المالكي، الحنبلي)",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        showSettingsDialog = true
                     },
                     modifier = Modifier.background(EmeraldContainer, RoundedCornerShape(10.dp))
                 ) {
@@ -460,6 +565,10 @@ fun TimingsTab(viewModel: PrayerViewModel) {
             },
             onDismiss = { showCityDialog = false }
         )
+    }
+
+    if (showSettingsDialog) {
+        CustomSettingsDialog(viewModel = viewModel, onDismiss = { showSettingsDialog = false })
     }
 }
 
@@ -1463,150 +1572,23 @@ fun MosqueItemCard(mosque: LocationHelper.Mosque) {
 
 @Composable
 fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example.data.LocationHelper.Mosque>) {
-    var selectedMapType by remember { mutableStateOf(1) } // 0: Classic, 1: Google Maps (Default)
-    val context = androidx.compose.ui.platform.LocalContext.current
-    
     val googleMapsUrl = remember(latitude, longitude) {
         "https://maps.google.com/maps?q=mosques+near+$latitude,$longitude&t=&z=14&ie=UTF8&iwloc=&output=embed"
     }
 
-    // Dynamically build Leaflet JS marker strings for each nearby mosque item
-    val mosqueMarkersJs = remember(mosques) {
-        val sb = StringBuilder()
-        mosques.forEach { mosque ->
-            val safeName = mosque.nameAr.replace("'", "\\'")
-            val safeAddress = mosque.addressAr.replace("'", "\\'")
-            val safeDistance = mosque.getFormattedDistance()
-            sb.append("""
-                L.marker([${mosque.latitude}, ${mosque.longitude}], {icon: mosqueIcon}).addTo(map)
-                    .bindPopup("<div style='text-align: right; direction: rtl;'><b>$safeName</b><br/>$safeAddress<br/><b>$safeDistance</b></div>");
-            """.trimIndent())
-        }
-        sb.toString()
-    }
-
-    val htmlContent = remember(latitude, longitude, mosqueMarkersJs) {
-        """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <style>
-                body { margin: 0; padding: 0; background: #031A11; }
-                #map { height: 100vh; width: 100vw; background: #031A11; }
-                .leaflet-popup-content-wrapper {
-                    background: #031A11 !important;
-                    color: #F5E5C9 !important;
-                    border: 1px solid #D4AF37 !important;
-                    font-family: sans-serif;
-                    text-align: right;
-                    border-radius: 8px;
-                }
-                .leaflet-popup-tip {
-                    background: #031A11 !important;
-                    border-left: 1px solid #D4AF37 !important;
-                    border-bottom: 1px solid #D4AF37 !important;
-                }
-                .leaflet-control-zoom {
-                    border: 1px solid #D4AF37 !important;
-                }
-                .leaflet-control-zoom-in, .leaflet-control-zoom-out {
-                    background: #031A11 !important;
-                    color: #D4AF37 !important;
-                    border-bottom: 1px solid #D4AF37 !important;
-                }
-            </style>
-        </head>
-        <body>
-            <div id="map"></div>
-            <script>
-                var map = L.map('map', { zoomControl: true }).setView([$latitude, $longitude], 15);
-                
-                // Dark theme tile provider
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 20,
-                    attribution: '© OpenStreetMap Core Map'
-                }).addTo(map);
-
-                // Marker design definitions
-                var userIcon = L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowSize: [41, 41]
-                });
-                
-                L.marker([$latitude, $longitude], {icon: userIcon}).addTo(map)
-                    .bindPopup("<div style='text-align: right; direction: rtl;'><b>موقعك الحالي الجغرافي 📍</b></div>").openPopup();
-
-                var mosqueIcon = L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowSize: [41, 41]
-                });
-
-                $mosqueMarkersJs
-            </script>
-        </body>
-        </html>
-    """.trimIndent()
-    }
-
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-        // Selector tab
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
-                .background(EmeraldContainer, RoundedCornerShape(10.dp))
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (selectedMapType == 1) IslamicGold else Color.Transparent)
-                    .clickable { selectedMapType = 1 }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "خرائط Google Maps الحية 🗺️",
-                    color = if (selectedMapType == 1) EmeraldDeepDark else SandText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (selectedMapType == 0) IslamicGold else Color.Transparent)
-                    .clickable { selectedMapType = 0 }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "الخريطة الداكنة المخصصة 🌐",
-                    color = if (selectedMapType == 0) EmeraldDeepDark else SandText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+        Text(
+            text = "خريطة المساجد الحية (Google Maps) 🗺️",
+            color = SandText,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .height(290.dp)
                 .border(1.5.dp, Color(0xFFD4AF37).copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF031A11))
@@ -1618,26 +1600,574 @@ fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
+                            databaseEnabled = true
+                            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
                             loadWithOverviewMode = true
                             useWideViewPort = true
                             userAgentString = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Mobile Safari/537.36"
                         }
-                        if (selectedMapType == 1) {
-                            loadUrl(googleMapsUrl)
-                        } else {
-                            loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
-                        }
+                        loadUrl(googleMapsUrl)
                     }
                 },
                 update = { webView ->
-                    if (selectedMapType == 1) {
-                        webView.loadUrl(googleMapsUrl)
-                    } else {
-                        webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
-                    }
+                    webView.loadUrl(googleMapsUrl)
                 },
                 modifier = Modifier.fillMaxSize()
             )
+        }
+    }
+}
+
+@Composable
+fun StartupPermissionRequestDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val notificationManager = remember { context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager }
+    
+    // Check states dynamically
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    
+    var hasDndPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                notificationManager.isNotificationPolicyAccessGranted
+            } else {
+                true
+            }
+        )
+    }
+
+    // Permission launcher for Location
+    val locationLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fineGranted || coarseGranted) {
+            hasLocationPermission = true
+            android.widget.Toast.makeText(context, "تم تفعيل الوصول إلى الموقع بنجاح 📍", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = { onDismiss() }
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .border(2.dp, IslamicGold, RoundedCornerShape(24.dp)),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF01140E)) // Deep rich emerald background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Mosque icon badge
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(IslamicGold.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mosque,
+                        contentDescription = "التحقق من الأذونات",
+                        tint = IslamicGold,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "الأذونات والصلاحيات المطلوبة 📝",
+                    color = SandText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "يرجى منح التطبيق الصلاحيات التالية ليعمل بأعلى كفاءة ودقة في الخلفية لتنبيهك وإجراء كتم الصوت التلقائي:",
+                    color = SandText.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // 1. Location permission row
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (hasLocationPermission) EmeraldContainer else Color(0xFF032215)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "تحديد الموقع الجغرافي 📍",
+                                color = SandText,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "لحساب مواقيت الصلاة الصحيحة حسب مكانك والبحث عن المساجد القريبة.",
+                                color = SandText.copy(alpha = 0.7f),
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (hasLocationPermission) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Granted",
+                                tint = IslamicGold,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Button(
+                                onClick = {
+                                    locationLauncher.launch(
+                                        arrayOf(
+                                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = IslamicGold),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("سماح", color = EmeraldDeepDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 2. DND silent policy permission row
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (hasDndPermission) EmeraldContainer else Color(0xFF032215)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "وصول لوضع صامت (DND) 🌙",
+                                color = SandText,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "لكتم صوت الهاتف تلقائياً أثناء الصلاة وإرجاعه للوضع الطبيعي بعد إنهائها.",
+                                color = SandText.copy(alpha = 0.7f),
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (hasDndPermission) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Granted",
+                                tint = IslamicGold,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                        try {
+                                            val intent = Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                                            context.startActivity(intent)
+                                            android.widget.Toast.makeText(context, "الرجاء تفعيل وصول التطبيق والعودة 🕌", android.widget.Toast.LENGTH_LONG).show()
+                                        } catch (e: Exception) {
+                                            android.widget.Toast.makeText(context, "فشل فتح الإعدادات تلقائياً", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = IslamicGold),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("تفعيل", color = EmeraldDeepDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = { onDismiss() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, IslamicGold.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "دخول للتطبيق ✨",
+                        color = IslamicGold,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CustomSettingsDialog(
+    viewModel: com.example.data.PrayerViewModel,
+    onDismiss: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val juristicRule by viewModel.juristicRule.collectAsState()
+    
+    val sharedPrefs = remember { context.getSharedPreferences("silent_pray_prefs", Context.MODE_PRIVATE) }
+    
+    var isAdhanEnabled by remember {
+        mutableStateOf(sharedPrefs.getBoolean("prefs_adhan_enabled", true))
+    }
+    var isFridayNoMuteEnabled by remember {
+        mutableStateOf(sharedPrefs.getBoolean("prefs_friday_no_mute", true))
+    }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .border(2.dp, IslamicGold, RoundedCornerShape(24.dp)),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF01140E)) // Deep beautiful emerald dark background
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                item {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .background(IslamicGold.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "الإعدادات",
+                            tint = IslamicGold,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "خيارات الإعدادات المخصصة ⚙️",
+                        color = SandText,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // 1. Juristic Rule Option
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF032215)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "المذهب الفقهي (العصر)",
+                                    color = SandText,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (juristicRule == com.example.data.PrayerTimesCalculator.JuristicRule.HANAFI) "المذهب الحنفي" else "الجمهور (مالكي، شافعي، حنبلي)",
+                                    color = SandText.copy(alpha = 0.7f),
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Switch(
+                                checked = juristicRule == com.example.data.PrayerTimesCalculator.JuristicRule.HANAFI,
+                                onCheckedChange = { isHanafi ->
+                                    val newRule = if (isHanafi) {
+                                        com.example.data.PrayerTimesCalculator.JuristicRule.HANAFI
+                                    } else {
+                                        com.example.data.PrayerTimesCalculator.JuristicRule.STANDARD
+                                    }
+                                    viewModel.updateJuristicRule(newRule)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = IslamicGold,
+                                    checkedTrackColor = EmeraldDeepDark,
+                                    uncheckedThumbColor = SlateGray,
+                                    uncheckedTrackColor = Color.DarkGray
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // 2. Adhan Switch Option
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF032215)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "تفعيل أذان مواقيت الصلاة 🕌",
+                                    color = SandText,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "تنبيه صوتي اختياري عند دخول وقت الأذان",
+                                    color = SandText.copy(alpha = 0.7f),
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Switch(
+                                checked = isAdhanEnabled,
+                                onCheckedChange = {
+                                    isAdhanEnabled = it
+                                    sharedPrefs.edit().putBoolean("prefs_adhan_enabled", it).apply()
+                                    viewModel.scheduleAllPrayerAlarms() // Refreshes alarms
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = IslamicGold,
+                                    checkedTrackColor = EmeraldDeepDark,
+                                    uncheckedThumbColor = SlateGray,
+                                    uncheckedTrackColor = Color.DarkGray
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // 3. Friday No Mute Option
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF032215)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "منع كتم الصوت صلاة الجمعة 🕋",
+                                    color = SandText,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "إيقاف الصامت لتمكين سماع خطبة الجمعة بالتفصيل",
+                                    color = SandText.copy(alpha = 0.7f),
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Switch(
+                                checked = isFridayNoMuteEnabled,
+                                onCheckedChange = {
+                                    isFridayNoMuteEnabled = it
+                                    sharedPrefs.edit().putBoolean("prefs_friday_no_mute", it).apply()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = IslamicGold,
+                                    checkedTrackColor = EmeraldDeepDark,
+                                    uncheckedThumbColor = SlateGray,
+                                    uncheckedTrackColor = Color.DarkGray
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // 4. About Us section
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF021710)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                         Divider(color = IslamicGold.copy(alpha = 0.3f), thickness = 1.dp)
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "من نحن ℹ️",
+                        color = IslamicGold,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = EmeraldContainer),
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, IslamicGold.copy(alpha = 0.2f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "مجموعة \"المُسلم\" لخدمة الاسلام و المسلمين",
+                                color = SandText,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            
+                            Text(
+                                text = "يسعدنا ويشرفنا تواصلكم واقتراحاتكم القيمة لتطوير وتجويد خدماتنا الإسلامية الموجهة للمسلمين.",
+                                color = SandText.copy(alpha = 0.8f),
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 16.sp
+                            )
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = "Email",
+                                    tint = IslamicGold,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                androidx.compose.foundation.text.selection.SelectionContainer {
+                                    Text(
+                                        text = "boubchirabdelilah@gmail.com",
+                                        color = SandText,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Phone,
+                                    contentDescription = "Phone",
+                                    tint = IslamicGold,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                androidx.compose.foundation.text.selection.SelectionContainer {
+                                    Text(
+                                        text = "00213673697554",
+                                        color = SandText,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5. Close button
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(containerColor = IslamicGold),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "تم وحفظ الإعدادات 👍",
+                            color = EmeraldDeepDark,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
     }
 }
