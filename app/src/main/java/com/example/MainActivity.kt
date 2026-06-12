@@ -492,6 +492,11 @@ fun TimingsTab(viewModel: PrayerViewModel) {
             }
         }
 
+        // Date and Hijri / Friday Blessed practices
+        item {
+            DateAndFridayHeader()
+        }
+
         // Beautiful Radial Golden Dome Canvas and Countdown
         item {
             GoldenDomeCountdownHeader(
@@ -2549,6 +2554,268 @@ fun CustomSettingsDialog(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// HIJRI DATE & BLESSED JUMU'AH SECTION
+// ==========================================
+
+fun getArabicFriendlyHijriDate(): String {
+    val cal = Calendar.getInstance()
+    var year = cal.get(Calendar.YEAR)
+    var month = cal.get(Calendar.MONTH) + 1
+    val day = cal.get(Calendar.DAY_OF_MONTH)
+    
+    // Julian Day calculation
+    if (month < 3) {
+        year -= 1
+        month += 12
+    }
+    val a = (year / 100).toInt()
+    val b = (a / 4).toInt()
+    val c = 2 - a + b
+    val e = (365.25 * (year + 4716)).toInt()
+    val f = (30.6001 * (month + 1)).toInt()
+    val jd = c + day + e + f - 1524
+    
+    // Convert Julian Day to Hijri
+    val l = jd - 1948440 + 10632
+    val n = ((l - 1) / 10631).toInt()
+    val l2 = l - 10631 * n + 354
+    val j = (((10985 - l2) / 5316).toInt()) * ((50 + l2) / 2307).toInt() + ((l2 / 2137).toInt()) * ((4713 - l2) / 1151).toInt()
+    val l3 = l2 - ((30 - j) / 15).toInt() * ((17719 * j) / 50).toInt() - (j / 16).toInt() * ((17719 * j) / 50).toInt() + 29
+    val mHijri = ((24 * l3) / 709).toInt()
+    val dHijri = l3 - ((709 * mHijri) / 24).toInt()
+    val yHijri = 30 * n + j - 30
+    
+    val hijriMonths = arrayOf(
+        "محرم", "صفر", "ربيع الأول", "ربيع الآخر", 
+        "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", 
+        "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+    )
+    val monthName = if (mHijri in 1..12) hijriMonths[mHijri - 1] else "ذو الحجة"
+    return "$dHijri $monthName $yHijri هـ"
+}
+
+fun getArabicGregorianDate(): String {
+    val cal = Calendar.getInstance()
+    val gregFormatter = SimpleDateFormat("EEEE، d MMMM yyyy", Locale("ar"))
+    return gregFormatter.format(cal.time)
+}
+
+fun isTodayFriday(): Boolean {
+    val cal = Calendar.getInstance()
+    return cal.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
+}
+
+@Composable
+fun DateAndFridayHeader() {
+    val context = LocalContext.current
+    val calendar = remember { Calendar.getInstance() }
+    val isFriday = remember { isTodayFriday() }
+    val gregDate = remember { getArabicGregorianDate() }
+    val hijriDate = remember { getArabicFriendlyHijriDate() }
+    
+    var isExpanded by remember { mutableStateOf(false) }
+    
+    val weekOfYear = remember { calendar.get(Calendar.WEEK_OF_YEAR) }
+    val year = remember { calendar.get(Calendar.YEAR) }
+    val prefs = remember { context.getSharedPreferences("friday_sunnah_prefs", Context.MODE_PRIVATE) }
+    
+    val sunnahItems = listOf(
+        "الغسل والتطيب والتعطر 🧼",
+        "لبس أحسن الثياب والتأنق 👕",
+        "السواك وتقليم الأظافر 🦷",
+        "التبكير والذهاب مبكراً للمسجد 🕌",
+        "قراءة سورة الكهف المباركة 📖",
+        "الإكثار من الصلاة على النبي ﷺ 📿",
+        "تحري الدعاء وساعة الاستجابة 🤲"
+    )
+    
+    // Check states
+    val checkStates = remember(weekOfYear, year) {
+        sunnahItems.indices.map { index ->
+            mutableStateOf(prefs.getBoolean("sunnah_${index}_${weekOfYear}_${year}", false))
+        }
+    }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isFriday) {
+                EmeraldContainer
+            } else {
+                EmeraldContainer.copy(alpha = 0.6f)
+            }
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isFriday) 1.5.dp else 1.dp,
+            color = if (isFriday) IslamicGold else IslamicGold.copy(alpha = 0.2f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Golden Crescent / Friday Badge on the left
+                if (isFriday) {
+                    Box(
+                        modifier = Modifier
+                            .background(IslamicGold.copy(alpha = 0.15f), CircleShape)
+                            .clickable { isExpanded = !isExpanded }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = "عرض سنن الجمعة",
+                                tint = IslamicGold,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "أعمال وسنن الجمعة ✨",
+                                color = IslamicGold,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                } else {
+                    // Small Hijri aesthetic icon
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "Hijri Moon Star",
+                        tint = IslamicGold.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Date texts aligned to the right
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = hijriDate,
+                        color = SandGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Right
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = gregDate,
+                        color = SlateGray,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Right
+                    )
+                }
+            }
+
+            // Beautiful status for Friday
+            if (isFriday) {
+                Spacer(modifier = Modifier.height(8.dp))
+                androidx.compose.material3.HorizontalDivider(
+                    color = IslamicGold.copy(alpha = 0.15f),
+                    thickness = 1.dp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "جمعة مباركة! يوم عظيم يستحب فيه التقرب بالطاعات وذكر الله والسنن النبوية.",
+                        color = SandText.copy(alpha = 0.9f),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Right,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.Mosque,
+                        contentDescription = "جمعة مباركة",
+                        tint = IslamicGold,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                // Expandable Sunnah list if isFriday is true and clicked
+                if (isExpanded) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "جدول سنن وآداب يوم الجمعة 📝",
+                        color = IslamicGold,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    
+                    sunnahItems.forEachIndexed { index, sunnahTitle ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val newVal = !checkStates[index].value
+                                    checkStates[index].value = newVal
+                                    prefs.edit().putBoolean("sunnah_${index}_${weekOfYear}_${year}", newVal).apply()
+                                }
+                                .padding(vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text(
+                                text = sunnahTitle,
+                                color = if (checkStates[index].value) SlateGray else SandText,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Right,
+                                style = androidx.compose.ui.text.TextStyle(
+                                    textDecoration = if (checkStates[index].value) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            androidx.compose.material3.Checkbox(
+                                checked = checkStates[index].value,
+                                onCheckedChange = { newVal ->
+                                    checkStates[index].value = newVal
+                                    prefs.edit().putBoolean("sunnah_${index}_${weekOfYear}_${year}", newVal).apply()
+                                },
+                                colors = androidx.compose.material3.CheckboxDefaults.colors(
+                                    checkedColor = IslamicGold,
+                                    uncheckedColor = SlateGray,
+                                    checkmarkColor = EmeraldDeepDark
+                                ),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                } else {
+                    // Small invitation to expand
+                    Text(
+                        text = "اضغط للمشاهدة والمتابعة لقائمة سنن الجمعة 📥",
+                        color = IslamicGold.copy(alpha = 0.8f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { isExpanded = true }
+                            .padding(top = 4.dp)
+                    )
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.Application
 import android.app.PendingIntent
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+@SuppressLint("ScheduleExactAlarm")
 class PrayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext

@@ -119,3 +119,25 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+val buildDirFile = layout.buildDirectory.get().asFile
+val rootDirFile = rootDir
+
+tasks.register("copyApkToRoot") {
+    val src = File(buildDirFile, "outputs/apk/debug/app-debug.apk")
+    val dest = File(rootDirFile, "silentpray.apk")
+    inputs.file(src)
+    outputs.file(dest)
+    doLast {
+        if (src.exists()) {
+            src.copyTo(dest, overwrite = true)
+            println("APK copied to root directory successfully as silentpray.apk")
+        } else {
+            println("Source APK does not exist yet: ${src.absolutePath}")
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy("copyApkToRoot")
+}

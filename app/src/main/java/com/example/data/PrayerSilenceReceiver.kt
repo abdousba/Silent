@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -16,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+@SuppressLint("ScheduleExactAlarm")
 class PrayerSilenceReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -97,13 +99,21 @@ class PrayerSilenceReceiver : BroadcastReceiver() {
                         )
                         
                         val unmuteTime = System.currentTimeMillis() + (silenceDuration * 60 * 1000L)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            alarmManager.setExactAndAllowWhileIdle(
-                                android.app.AlarmManager.RTC_WAKEUP,
-                                unmuteTime,
-                                unmutePending
-                            )
-                        } else {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                alarmManager.setExactAndAllowWhileIdle(
+                                    android.app.AlarmManager.RTC_WAKEUP,
+                                    unmuteTime,
+                                    unmutePending
+                                )
+                            } else {
+                                alarmManager.set(
+                                    android.app.AlarmManager.RTC_WAKEUP,
+                                    unmuteTime,
+                                    unmutePending
+                                )
+                            }
+                        } catch (e: Exception) {
                             alarmManager.set(
                                 android.app.AlarmManager.RTC_WAKEUP,
                                 unmuteTime,
