@@ -1774,13 +1774,88 @@ fun MosqueItemCard(mosque: LocationHelper.Mosque) {
 
 @Composable
 fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example.data.LocationHelper.Mosque>) {
-    val googleMapsUrl = remember(latitude, longitude) {
-        "https://maps.google.com/maps?q=mosques+near+$latitude,$longitude&t=&z=14&ie=UTF8&iwloc=&output=embed"
+    val htmlContent = remember(latitude, longitude, mosques) {
+        val markersJS = mosques.map { mosque ->
+            """
+            L.marker([${mosque.latitude}, ${mosque.longitude}], {icon: mosqueIcon})
+                .addTo(map)
+                .bindPopup("<b>${mosque.nameAr.replace("'", "\\'").replace("\"", "\\\"")}</b><br>${mosque.addressAr.replace("'", "\\'").replace("\"", "\\\"")}<br>📌 تبعد ${mosque.getFormattedDistance()}");
+            """.trimIndent()
+        }.joinToString("\n")
+
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+                html, body, #map {
+                    width: 100%;
+                    height: 100%;
+                    margin: 0;
+                    padding: 0;
+                    background: #031A11;
+                }
+                .leaflet-popup-content-wrapper {
+                    background: #0C3325 !important;
+                    color: #E2DDD5 !important;
+                    border-radius: 12px !important;
+                    border: 1px solid #D4AF37 !important;
+                    font-family: sans-serif;
+                    text-align: right;
+                    direction: rtl;
+                }
+                .leaflet-popup-tip {
+                    background: #0C3325 !important;
+                }
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            <script>
+                var map = L.map('map', {
+                    zoomControl: false,
+                    attributionControl: false
+                }).setView([$latitude, $longitude], 14);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19
+                }).addTo(map);
+
+                // Custom icon for user
+                var userIcon = L.divIcon({
+                    className: 'user-marker',
+                    html: '<div style="background-color: #007AFF; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.4);"></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+
+                // Custom icon for mosques
+                var mosqueIcon = L.divIcon({
+                    className: 'mosque-marker',
+                    html: '<div style="background-color: #D4AF37; width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #031A11; box-shadow: 0 0 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 10px;">🕌</div>',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+
+                L.marker([$latitude, $longitude], {icon: userIcon})
+                    .addTo(map)
+                    .bindPopup("<b>أنت هنا 🧭</b><br>موقعك الحالي")
+                    .openPopup();
+
+                $markersJS
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
     }
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         Text(
-            text = "خريطة المساجد الحية (Google Maps) 🗺️",
+            text = "خريطة المساجد الحية المتكاملة 🗺️",
             color = SandText,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
@@ -1806,13 +1881,12 @@ fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example
                             cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
                             loadWithOverviewMode = true
                             useWideViewPort = true
-                            userAgentString = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Mobile Safari/537.36"
                         }
-                        loadUrl(googleMapsUrl)
+                        loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
                     }
                 },
                 update = { webView ->
-                    webView.loadUrl(googleMapsUrl)
+                    webView.loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
                 },
                 modifier = Modifier.fillMaxSize()
             )
