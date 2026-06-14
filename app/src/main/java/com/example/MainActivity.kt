@@ -305,7 +305,7 @@ fun SplashScreenComponent(onFinished: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF031A11)),
+            .background(EmeraldDeepDark),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -322,7 +322,7 @@ fun SplashScreenComponent(onFinished: () -> Unit) {
                         scaleY = scaleAnim
                     ),
                 shape = RoundedCornerShape(32.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0C3325)),
+                colors = CardDefaults.cardColors(containerColor = EmeraldContainer),
                 elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
                 border = androidx.compose.foundation.BorderStroke(1.5.dp, IslamicGold.copy(alpha = 0.5f))
             ) {
@@ -872,7 +872,7 @@ fun CitySelectionDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 12.dp)
-                        .background(Color(0xFF031A11), RoundedCornerShape(12.dp))
+                        .background(EmeraldDeepDark, RoundedCornerShape(12.dp))
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -945,8 +945,8 @@ fun CitySelectionDialog(
                         unfocusedTextColor = SandText,
                         focusedBorderColor = IslamicGold,
                         unfocusedBorderColor = IslamicGold.copy(alpha = 0.3f),
-                        focusedContainerColor = Color(0xFF031A11),
-                        unfocusedContainerColor = Color(0xFF031A11),
+                        focusedContainerColor = EmeraldDeepDark,
+                        unfocusedContainerColor = EmeraldDeepDark,
                         cursorColor = IslamicGold
                     ),
                     shape = RoundedCornerShape(12.dp)
@@ -984,7 +984,7 @@ fun CitySelectionDialog(
                                     .padding(vertical = 4.dp)
                                     .clickable { onCitySelected(city) },
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (isFav) Color(0xFF032215) else Color.Transparent
+                                    containerColor = if (isFav) IslamicEmerald.copy(alpha = 0.12f) else Color.Transparent
                                 ),
                                 shape = RoundedCornerShape(12.dp),
                                 border = androidx.compose.foundation.BorderStroke(
@@ -1802,19 +1802,19 @@ fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example
                     height: 100%;
                     margin: 0;
                     padding: 0;
-                    background: #031A11;
+                    background: #FAF5EA;
                 }
                 .leaflet-popup-content-wrapper {
-                    background: #0C3325 !important;
-                    color: #E2DDD5 !important;
+                    background: #FFFDFC !important;
+                    color: #1B2616 !important;
                     border-radius: 12px !important;
-                    border: 1px solid #D4AF37 !important;
+                    border: 1px solid #4A5D3F !important;
                     font-family: sans-serif;
                     text-align: right;
                     direction: rtl;
                 }
                 .leaflet-popup-tip {
-                    background: #0C3325 !important;
+                    background: #FFFDFC !important;
                 }
             </style>
         </head>
@@ -1841,7 +1841,7 @@ fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example
                 // Custom icon for mosques
                 var mosqueIcon = L.divIcon({
                     className: 'mosque-marker',
-                    html: '<div style="background-color: #D4AF37; width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #031A11; box-shadow: 0 0 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 10px;">🕌</div>',
+                    html: '<div style="background-color: #4A5D3F; width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #FAF5EA; box-shadow: 0 0 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 10px;">🕌</div>',
                     iconSize: [24, 24],
                     iconAnchor: [12, 12]
                 });
@@ -1871,9 +1871,9 @@ fun MosqueMapView(latitude: Double, longitude: Double, mosques: List<com.example
             modifier = Modifier
                 .fillMaxWidth()
                 .height(290.dp)
-                .border(1.5.dp, Color(0xFFD4AF37).copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
+                .border(1.5.dp, IslamicGold.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF031A11))
+            colors = CardDefaults.cardColors(containerColor = EmeraldDeepDark)
         ) {
             androidx.compose.ui.viewinterop.AndroidView(
                 factory = { ctx ->
@@ -1985,7 +1985,7 @@ fun StartupPermissionRequestDialog(onDismiss: () -> Unit) {
                 .padding(16.dp)
                 .border(2.dp, IslamicGold, RoundedCornerShape(24.dp)),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF01140E)) // Deep rich emerald background
+            colors = CardDefaults.cardColors(containerColor = EmeraldContainer)
         ) {
             Column(
                 modifier = Modifier
@@ -2034,7 +2034,7 @@ fun StartupPermissionRequestDialog(onDismiss: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (hasLocationPermission) EmeraldContainer else Color(0xFF032215)
+                        containerColor = if (hasLocationPermission) EmeraldContainer else EmeraldDeepDark
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -2092,7 +2092,7 @@ fun StartupPermissionRequestDialog(onDismiss: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (hasDndPermission) EmeraldContainer else Color(0xFF032215)
+                        containerColor = if (hasDndPermission) EmeraldContainer else EmeraldDeepDark
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -2153,7 +2153,7 @@ fun StartupPermissionRequestDialog(onDismiss: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isBatteryOptimizedIgnored) EmeraldContainer else Color(0xFF032215)
+                        containerColor = if (isBatteryOptimizedIgnored) EmeraldContainer else EmeraldDeepDark
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -2260,7 +2260,7 @@ fun CustomSettingsDialog(
                 .padding(8.dp)
                 .border(2.dp, IslamicGold, RoundedCornerShape(24.dp)),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF01140E)) // Deep beautiful emerald dark background
+            colors = CardDefaults.cardColors(containerColor = EmeraldContainer)
         ) {
             LazyColumn(
                 modifier = Modifier
@@ -2300,7 +2300,7 @@ fun CustomSettingsDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF032215)),
+                        colors = CardDefaults.cardColors(containerColor = EmeraldContainer),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
@@ -2349,7 +2349,7 @@ fun CustomSettingsDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF032215)),
+                        colors = CardDefaults.cardColors(containerColor = EmeraldContainer),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
@@ -2395,7 +2395,7 @@ fun CustomSettingsDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF032215)),
+                        colors = CardDefaults.cardColors(containerColor = EmeraldContainer),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
@@ -2439,7 +2439,7 @@ fun CustomSettingsDialog(
                     Spacer(modifier = Modifier.height(16.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF021710)),
+                        colors = CardDefaults.cardColors(containerColor = EmeraldContainer),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                          Divider(color = IslamicGold.copy(alpha = 0.3f), thickness = 1.dp)

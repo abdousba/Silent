@@ -305,7 +305,7 @@ fun AzkarCardItem(
             .clickable { onItemClick() },
         colors = CardDefaults.cardColors(
             containerColor = if (isCompleted) {
-                Color(0xFF042618) // Muted highlight
+                IslamicEmerald.copy(alpha = 0.12f) // Muted highlight
             } else {
                 EmeraldContainer
             }
@@ -354,7 +354,7 @@ fun AzkarCardItem(
                         modifier = Modifier
                             .size(24.dp)
                             .background(
-                                if (isCompleted) IslamicGold else Color(0xFF031A11),
+                                if (isCompleted) IslamicGold else SlateGray.copy(alpha = 0.15f),
                                 CircleShape
                             ),
                         contentAlignment = Alignment.Center
