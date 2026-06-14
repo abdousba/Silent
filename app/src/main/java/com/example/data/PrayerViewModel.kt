@@ -80,9 +80,17 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _silenceTimeRemainingText = MutableStateFlow("")
     val silenceTimeRemainingText: StateFlow<String> = _silenceTimeRemainingText.asStateFlow()
 
+    // 8. Theme preference state
+    private val _isDarkMode = MutableStateFlow(false)
+    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
+
     private var countdownJob: Job? = null
 
     init {
+        // Load persisted theme preference
+        val prefs = context.getSharedPreferences("silent_pray_prefs", Context.MODE_PRIVATE)
+        _isDarkMode.value = prefs.getBoolean("is_dark_mode", false)
+
         // Load persisted city config if available
         val savedCity = loadSelectedCity()
         if (savedCity != null) {
@@ -439,6 +447,12 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         context.sendBroadcast(intent)
         checkSilentPrefsState()
+    }
+
+    fun setDarkMode(enabled: Boolean) {
+        _isDarkMode.value = enabled
+        val prefs = context.getSharedPreferences("silent_pray_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("is_dark_mode", enabled).apply()
     }
 
     // Core continuous ticker for Next Prayer Countdown and Silent Simulator updates

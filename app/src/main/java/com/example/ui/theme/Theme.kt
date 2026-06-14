@@ -43,6 +43,7 @@ fun MyApplicationTheme(
   dynamicColor: Boolean = false,
   content: @Composable () -> Unit,
 ) {
+  ThemeColors.isDark = darkTheme
   val colorScheme =
     when {
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {

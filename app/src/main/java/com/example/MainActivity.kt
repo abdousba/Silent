@@ -94,10 +94,11 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            MyApplicationTheme(darkTheme = true) { // Immersive Dark Theme Enabled
-                val mainViewModel: PrayerViewModel = viewModel()
-                modelInstance = mainViewModel
+            val mainViewModel: PrayerViewModel = viewModel()
+            modelInstance = mainViewModel
+            val isDarkMode by mainViewModel.isDarkMode.collectAsState()
 
+            MyApplicationTheme(darkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -446,17 +447,36 @@ fun TimingsTab(viewModel: PrayerViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = {
-                        showSettingsDialog = true
-                    },
-                    modifier = Modifier.background(EmeraldContainer, RoundedCornerShape(10.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings info",
-                        tint = IslamicGold
-                    )
+                    IconButton(
+                        onClick = {
+                            showSettingsDialog = true
+                        },
+                        modifier = Modifier.background(EmeraldContainer, RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings info",
+                            tint = IslamicGold
+                        )
+                    }
+
+                    val isDarkTheme by viewModel.isDarkMode.collectAsState()
+                    IconButton(
+                        onClick = {
+                            viewModel.setDarkMode(!isDarkTheme)
+                        },
+                        modifier = Modifier.background(EmeraldContainer, RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.NightsStay,
+                            contentDescription = "تغيير المظهر",
+                            tint = IslamicGold
+                        )
+                    }
                 }
 
                 Row(
